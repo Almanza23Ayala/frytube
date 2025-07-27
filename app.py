@@ -52,7 +52,7 @@ def obtener_stream_url(video_id):
         'format': 'best',
         'quiet': True,
         'noplaylist': True,
-        'cookiefile': 'cookies.txt'
+        'cookies': 'cookies.txt'
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
