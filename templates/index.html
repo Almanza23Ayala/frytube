@@ -91,6 +91,14 @@
 </head>
 <body>
   <button id="modo-btn" onclick="toggleModo()">🌙 Modo oscuro</button>
+
+  {% if user %}
+    <p>👋 Bienvenido, <strong>{{ user["name"] }}</strong> (<a href="{{ url_for('logout') }}">Cerrar sesión</a>)</p>
+  {% else %}
+    <p><a href="{{ url_for('login') }}">Iniciar sesión con Google</a></p>
+  {% endif %}
+
+
   <h1>🔥 Frytube🔥</h1>
   <input type="text" id="query" placeholder="Buscar o pegar link...">
   <button onclick="buscar()">Buscar</button>
