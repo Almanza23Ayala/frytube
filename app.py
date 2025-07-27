@@ -8,7 +8,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-YOUTUBE_API_KEY = "YOUTUBE_API_KEY"
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 YOUTUBE_VIDEO_DETAILS_URL = "https://www.googleapis.com/youtube/v3/videos"
 
