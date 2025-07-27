@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/icon-192.png">
+  <meta name="theme-color" content="#ff0000">
+  <title>Frytube</title>
+  <style>
+    body {
+      background-color: #ece7e7;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    body.dark {
+      background-color: #121212;
+      color: white;
+    }
+    #query {
+      width: 60%;
+      padding: 8px;
+    }
+    video {
+      width: 90%;
+      max-width: 800px;
+      margin-top: 10px;
+      border-radius: 12px;
+    }
+    .video-item {
+      display: inline-block;
+      width: 200px;
+      margin: 10px;
+      cursor: pointer;
+      vertical-align: top;
+      text-align: left;
+      transition: transform 0.2s, box-shadow 0.3s;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+    .video-item:hover {
+      transform: scale(1.03);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+    .video-item img {
+      width: 100%;
+      border-radius: 12px;
+    }
+    .video-title {
+      font-weight: bold;
+      font-size: 14px;
+      padding: 4px;
+    }
+    .video-uploader {
+      font-size: 12px;
+      color: #555;
+      padding-left: 4px;
+      padding-bottom: 6px;
+    }
+    #controles button {
+      margin: 5px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #video-thumbnail {
+      margin-top: 10px;
+    }
+    #video-thumbnail img {
+      width: 180px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    #modo-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      cursor: pointer;
+    }
+  </style>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/service-worker.js')
+          .then(() => console.log("✅ Service Worker registrado"))
+          .catch(err => console.error("❌ Error SW:", err));
+      });
+    }
+  </script>
+</head>
+<body>
+  <button id="modo-btn" onclick="toggleModo()">🌙 Modo oscuro</button>
+  <h1>🔥 Frytube🔥</h1>
+  <input type="text" id="query" placeholder="Buscar o pegar link...">
+  <button onclick="buscar()">Buscar</button>
+
+  <div id="video-section" style="margin-top: 20px;">
+    <div id="video-info"></div>
+    <video id="player" controls></video>
+    <div id="controles">
+      <button onclick="reproducir(videoActual - 1)">◀ Anterior</button>
+      <button onclick="reproducir(videoActual + 1)">Siguiente ▶</button>
+    </div>
+    <div id="video-thumbnail"></div>
+  </div>
+
+  <div id="lista-videos" style="margin-top: 30px;"></div>
+
+  <script>
+    let listaVideos = [];
+    let videoActual = -1;
+    let cache = {};
+    let historial = JSON.parse(localStorage.getItem('historial')) || [];
+
+    function toggleModo() {
+      document.body.classList.toggle('dark');
+      const esOscuro = document.body.classList.contains('dark');
+      document.getElementById('modo-btn').textContent = esOscuro ? '☀️ Modo claro' : '🌙 Modo oscuro';
+    }
+
+    async function buscar() {
+      const query = document.getElementById('query').value.trim();
+      if (!query) return;
+
+      document.getElementById('lista-videos').innerHTML = '🔍 Buscando...';
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+
+      listaVideos = data.results;
+      videoActual = -1;
+      mostrarLista(listaVideos);
+    }
+
+    function mostrarLista(videos) {
+      const contenedor = document.getElementById('lista-videos');
+      contenedor.innerHTML = '';
+
+      videos.forEach((video, i) => {
+        const div = document.createElement('div');
+        div.className = 'video-item';
+        div.innerHTML = `
+          <img src="${video.thumbnail}">
+          <div class="video-title">${video.title}</div>
+          <div class="video-uploader">${video.uploader}</div>
+        `;
+        div.onclick = () => reproducir(i);
+        contenedor.appendChild(div);
+      });
+    }
+
+    async function reproducir(index) {
+      if (index < 0 || index >= listaVideos.length) return;
+      videoActual = index;
+      const video_id = listaVideos[videoActual].video_id;
+
+      if (cache[video_id]) {
+        mostrarReproductor(cache[video_id]);
+      } else {
+        const res = await fetch('/api/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video_id })
+        });
+        const data = await res.json();
+        if (data.error) {
+          alert('Error: ' + data.error);
+          return;
+        }
+        cache[video_id] = data;
+        mostrarReproductor(data);
+      }
+
+      // Guardar en historial
+      historial.unshift(listaVideos[videoActual]);
+      historial = historial.slice(0, 10);
+      localStorage.setItem('historial', JSON.stringify(historial));
+    }
+
+    function mostrarReproductor(video) {
+      const player = document.getElementById('player');
+      player.src = video.url;
+      player.play();
+
+      document.getElementById('video-info').innerHTML = `
+        <h2>${video.title}</h2>
+        <p>Subido por: ${video.uploader}</p>
+      `;
+
+      document.getElementById('video-thumbnail').innerHTML = `
+        <img src="${video.thumbnail}">
+      `;
+
+      player.onended = () => {
+        if (videoActual + 1 < listaVideos.length) {
+          reproducir(videoActual + 1);
+        }
+      };
+    }
+  </script>
+</body>
+</html>
